@@ -1,0 +1,126 @@
+{
+  "model_version": "20261014-104019",
+  "selected_model": "random_forest",
+  "dataset_rows": 900,
+  "train_rows": 720,
+  "test_rows": 180,
+  "candidates_cv": {
+    "logistic_regression": {
+      "cv_f1_macro_mean": 0.4979,
+      "cv_f1_macro_std": 0.0328
+    },
+    "random_forest": {
+      "cv_f1_macro_mean": 0.5213,
+      "cv_f1_macro_std": 0.02
+    }
+  },
+  "candidates_test_f1_macro": {
+    "logistic_regression": 0.5403,
+    "random_forest": 0.5446
+  },
+  "test_metrics": {
+    "accuracy": 0.55,
+    "precision_macro": 0.541,
+    "recall_macro": 0.5516,
+    "f1_macro": 0.5446,
+    "per_class": {
+      "low": {
+        "precision": 0.6,
+        "recall": 0.5806,
+        "f1": 0.5902,
+        "support": 62
+      },
+      "medium": {
+        "precision": 0.3962,
+        "recall": 0.35,
+        "f1": 0.3717,
+        "support": 60
+      },
+      "high": {
+        "precision": 0.6269,
+        "recall": 0.7241,
+        "f1": 0.672,
+        "support": 58
+      }
+    },
+    "confusion_matrix": {
+      "labels": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "matrix": [
+        [
+          36,
+          21,
+          5
+        ],
+        [
+          19,
+          21,
+          20
+        ],
+        [
+          5,
+          11,
+          42
+        ]
+      ]
+    }
+  },
+  "rule_based_baseline_test_metrics": {
+    "accuracy": 0.4222,
+    "precision_macro": 0.4333,
+    "recall_macro": 0.4282,
+    "f1_macro": 0.3705,
+    "per_class": {
+      "low": {
+        "precision": 0.6061,
+        "recall": 0.3226,
+        "f1": 0.4211,
+        "support": 62
+      },
+      "medium": {
+        "precision": 0.3,
+        "recall": 0.1,
+        "f1": 0.15,
+        "support": 60
+      },
+      "high": {
+        "precision": 0.3937,
+        "recall": 0.8621,
+        "f1": 0.5405,
+        "support": 58
+      }
+    },
+    "confusion_matrix": {
+      "labels": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "matrix": [
+        [
+          20,
+          9,
+          33
+        ],
+        [
+          10,
+          6,
+          44
+        ],
+        [
+          3,
+          5,
+          50
+        ]
+      ]
+    }
+  },
+  "notes": [
+    "Trained on SYNTHETIC data: scores describe the simulation, not real students.",
+    "Test split is stratified and never used for model selection.",
+    "Predictions are decision-support estimates, not judgments about students."
+  ]
+}

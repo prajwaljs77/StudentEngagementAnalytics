@@ -1,0 +1,37 @@
+{% extends "auth_base.html" %}
+{% block title %}Register{% endblock %}
+{% block content %}
+{% macro err(name) %}{% if errors.get(name) %}<div class="text-danger small mt-1" role="alert">{{ errors[name] }}</div>{% endif %}{% endmacro %}
+<h1 class="h3 fw-bold mb-1">Create your account</h1>
+<p class="text-muted mb-4">Students and faculty can register here.</p>
+<form method="post" class="needs-validation" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="mb-3"><label class="form-label" for="name">Full name</label>
+    <input class="form-control {{ 'is-invalid' if errors.get('name') }}" id="name" name="name" required minlength="2" maxlength="100" value="{{ form.get('name','') }}" autocomplete="name">
+    <div class="invalid-feedback">Enter your name (at least 2 characters).</div>{{ err('name') }}</div>
+  <div class="mb-3"><label class="form-label" for="email">Email address</label>
+    <input class="form-control {{ 'is-invalid' if errors.get('email') }}" id="email" name="email" type="email" required maxlength="150" value="{{ form.get('email','') }}" autocomplete="email">
+    <div class="invalid-feedback">Enter a valid email address.</div>{{ err('email') }}</div>
+  <div class="mb-3"><label class="form-label" for="role">I am a</label>
+    <select class="form-select" id="role" name="role" required>
+      <option value="student" {{ 'selected' if form.get('role','student') == 'student' }}>Student</option>
+      <option value="faculty" {{ 'selected' if form.get('role') == 'faculty' }}>Faculty</option></select>{{ err('role') }}</div>
+  {% if invite_required %}
+  <div class="mb-3" id="inviteBox" style="display:none"><label class="form-label" for="invite_code">Faculty invitation code</label>
+    <input class="form-control {{ 'is-invalid' if errors.get('invite_code') }}" id="invite_code" name="invite_code" autocomplete="off">{{ err('invite_code') }}
+    <div class="form-text">Required for faculty accounts. Ask your administrator.</div></div>
+  {% endif %}
+  <div class="row g-3 mb-3">
+    <div class="col-sm-6"><label class="form-label" for="password">Password</label>
+      <input class="form-control {{ 'is-invalid' if errors.get('password') }}" id="password" name="password" type="password" required minlength="8" autocomplete="new-password">
+      <div class="invalid-feedback">At least 8 characters with a letter and a number.</div>{{ err('password') }}</div>
+    <div class="col-sm-6"><label class="form-label" for="confirm_password">Confirm password</label>
+      <input class="form-control {{ 'is-invalid' if errors.get('confirm_password') }}" id="confirm_password" name="confirm_password" type="password" required autocomplete="new-password">
+      <div class="invalid-feedback">Please repeat the password.</div>{{ err('confirm_password') }}</div>
+  </div>
+  <div class="form-text mb-3">Use at least 8 characters, including a letter and a number.</div>
+  <button class="btn btn-primary btn-lg w-100" type="submit">Create account</button>
+</form>
+<p class="text-center mt-4 mb-0">Already registered? <a href="{{ url_for('auth.login') }}">Log in</a></p>
+{% if invite_required %}<script>document.addEventListener("DOMContentLoaded",()=>{const r=document.getElementById("role"),b=document.getElementById("inviteBox");const s=()=>{b.style.display=r.value==="faculty"?"block":"none";};r.addEventListener("change",s);s();});</script>{% endif %}
+{% endblock %}

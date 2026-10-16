@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, empty, table_footer, confirm_form with context %}
+{% block title %}{{ 'Course details' if detail else ('Courses' if current_user.role == 'faculty' else 'My courses') }}{% endblock %}
+{% block content %}
+{% set faculty = current_user.role == 'faculty' %}
+
+{% macro course_form(prefix, modal_id, title, action) %}
+<div class="modal fade" id="{{ modal_id }}" tabindex="-1" aria-labelledby="{{ modal_id }}Label" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><form class="modal-content needs-validation" method="post" action="{{ action }}" novalidate>
+  {{ csrf() }}
+  <div class="modal-header"><h2 class="modal-title fs-5" id="{{ modal_id }}Label">{{ title }}</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+  <div class="modal-body">
+    <div class="mb-3"><label class="form-label" for="{{ prefix }}name">Course name</label><input class="form-control" id="{{ prefix }}name" name="course_name" required minlength="3" maxlength="150"><div class="invalid-feedback">Enter a course name (3-150 characters).</div></div>
+    <div class="mb-3"><label class="form-label" for="{{ prefix }}sem">Semester</label><input class="form-control" id="{{ prefix }}sem" name="semester" required maxlength="30" placeholder="e.g. Semester 3"><div class="invalid-feedback">Semester is required.</div></div>
+    <div class="mb-3"><label class="form-label" for="{{ prefix }}fac">Assigned faculty</label>
+      <select class="form-select" id="{{ prefix }}fac" name="faculty_id" required>{% for f in faculty_list %}<option value="{{ f.user_id }}" {{ 'selected' if f.user_id == current_user.user_id }}>{{ f.name }}</option>{% endfor %}</select></div>
+  </div>
+  <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Save course</button></div>
+</form></div></div>
+{% endmacro %}
+
+{% if detail %}
+  <nav aria-label="breadcrumb" class="mb-3"><a href="{{ url_for('courses.index') }}"><i class="bi bi-arrow-left"></i> All courses</a></nav>
+  <div class="row g-3 mb-3">
+    <div class="col-lg-8"><div class="card-x card-body-x"><h2 class="h4 mb-1">{{ course.course_name }}</h2>
+      <div class="text-muted"><i class="bi bi-calendar3 me-1"></i>{{ course.semester }} &nbsp;&middot;&nbsp; <i class="bi bi-person-badge me-1"></i>{{ course.faculty_name }}</div></div></div>
+    {% if faculty %}<div class="col-lg-4"><div class="card-x card-body-x">
+      <form method="post" action="{{ url_for('courses.enroll', course_id=course.course_id) }}" class="needs-validation" novalidate>{{ csrf() }}
+        <label class="form-label" for="enrollStudent">Enrol a student</label>
+        <div class="input-group"><select class="form-select" id="enrollStudent" name="student_id" required><option value="">Select student</option>{% for s in available %}<option value="{{ s.user_id }}">{{ s.name }} ({{ s.email }})</option>{% endfor %}</select>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg"></i> Enrol</button></div>
+        <div class="invalid-feedback">Choose a student.</div>
+        {% if not available %}<div class="form-text">All students are already enrolled (or none exist yet).</div>{% endif %}</form></div></div>{% endif %}
+  </div>
+  {% if faculty %}
+  <div class="card-x"><div class="card-head"><h2>Enrolled students ({{ students|length }})</h2></div>
+    {% if students %}<div class="table-responsive"><table class="table table-x align-middle"><thead><tr><th>Name</th><th>Email</th><th>Enrolled</th><th class="text-end">Actions</th></tr></thead><tbody>
+      {% for s in students %}<tr><td><a href="{{ url_for('students.detail', student_id=s.user_id) }}">{{ s.name }}</a></td><td>{{ s.email }}</td><td>{{ s.enrolled_at|dt('%d %b %Y') }}</td>
+        <td class="text-end"><form method="post" action="{{ url_for('courses.unenroll', course_id=course.course_id) }}" data-confirm="Remove {{ s.name }} from this course?" class="d-inline">{{ csrf() }}<input type="hidden" name="student_id" value="{{ s.user_id }}"><button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-person-dash me-1"></i>Remove</button></form></td></tr>{% endfor %}
+    </tbody></table></div>{% else %}{{ empty('people', 'No students enrolled yet', 'Use the enrol box to add students to this course.') }}{% endif %}</div>
+  {% endif %}
+{% else %}
+  <form class="card-x card-body-x filters mb-3 row g-2 align-items-end" method="get">
+    <div class="col-md-5"><label class="form-label" for="q">Search</label><input class="form-control" id="q" name="q" value="{{ request.args.get('q','') }}" placeholder="Course name"></div>
+    <div class="col-md-3"><label class="form-label" for="semester">Semester</label><select class="form-select" id="semester" name="semester"><option value="">All</option>{% for s in semesters %}<option value="{{ s }}" {{ 'selected' if request.args.get('semester') == s }}>{{ s }}</option>{% endfor %}</select></div>
+    <div class="col-md-4 d-flex gap-2"><button class="btn btn-primary"><i class="bi bi-search me-1"></i>Search</button><a class="btn btn-outline-secondary" href="{{ url_for('courses.index') }}">Clear</a>
+      {% if faculty %}<button class="btn btn-success ms-auto" type="button" data-bs-toggle="modal" data-bs-target="#createModal"><i class="bi bi-plus-lg me-1"></i>New course</button>{% endif %}</div>
+  </form>
+  <div class="card-x">
+    {% if courses %}<div class="table-responsive"><table class="table table-x align-middle"><thead><tr><th>Course</th><th>Semester</th><th>Faculty</th><th>Students</th><th class="text-end">Actions</th></tr></thead><tbody>
+      {% for c in courses %}<tr><td class="fw-semibold"><a href="{{ url_for('courses.detail', course_id=c.course_id) }}" class="text-decoration-none">{{ c.course_name }}</a></td><td>{{ c.semester }}</td><td>{{ c.faculty_name }}</td><td><span class="badge text-bg-light border">{{ c.enrolled_count }}</span></td>
+        <td class="text-end"><div class="dropdown"><button class="btn btn-sm btn-light" data-bs-toggle="dropdown" aria-label="Actions for {{ c.course_name }}"><i class="bi bi-three-dots-vertical"></i></button>
+          <ul class="dropdown-menu dropdown-menu-end"><li><a class="dropdown-item" href="{{ url_for('courses.detail', course_id=c.course_id) }}"><i class="bi bi-eye me-2"></i>View</a></li>
+          {% if faculty %}<li><button class="dropdown-item" data-edit-target="#editModal" data-action="{{ url_for('courses.edit', course_id=c.course_id) }}" data-fields='{{ {"course_name": c.course_name, "semester": c.semester, "faculty_id": c.faculty_id}|tojson }}'><i class="bi bi-pencil me-2"></i>Edit</button></li>
+          <li><hr class="dropdown-divider"></li><li>{{ confirm_form(url_for('courses.delete', course_id=c.course_id), 'Delete the course ' ~ c.course_name ~ '? This cannot be undone.', 'Delete') }}</li>{% endif %}</ul></div></td></tr>{% endfor %}
+    </tbody></table></div>{{ table_footer(page, total, per_page, 'course') }}
+    {% else %}{{ empty('journal-bookmark', 'No courses found', ('Create your first course with the “New course” button.' if faculty else 'You are not enrolled in any course yet.') if not request.args.get('q') else 'Try a different search.') }}{% endif %}
+  </div>
+  {% if faculty %}{{ course_form('c_', 'createModal', 'New course', url_for('courses.create')) }}{{ course_form('e_', 'editModal', 'Edit course', '#') }}{% endif %}
+{% endif %}
+{% endblock %}

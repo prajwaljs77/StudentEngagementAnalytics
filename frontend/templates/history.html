@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "_macros.html" import empty, table_footer, risk with context %}
+{% block title %}Prediction history{% endblock %}
+{% block content %}
+{% set faculty = current_user.role == 'faculty' %}
+<form class="card-x card-body-x filters mb-3 row g-2 align-items-end" method="get">
+  {% if faculty %}<div class="col-md-2"><label class="form-label" for="hs">Student</label><select class="form-select" id="hs" name="student_id"><option value="">All</option>{% for s in student_opts %}<option value="{{ s.user_id }}" {{ 'selected' if request.args.get('student_id')|string == s.user_id|string }}>{{ s.name }}</option>{% endfor %}</select></div>{% endif %}
+  <div class="col-md-3"><label class="form-label" for="hc">Course</label><select class="form-select" id="hc" name="course_id"><option value="">All</option>{% for c in courses %}<option value="{{ c.course_id }}" {{ 'selected' if request.args.get('course_id')|string == c.course_id|string }}>{{ c.course_name }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><label class="form-label" for="hr">Risk level</label><select class="form-select" id="hr" name="risk"><option value="">All</option>{% for r in ['low','medium','high'] %}<option value="{{ r }}" {{ 'selected' if request.args.get('risk') == r }}>{{ r|capitalize }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><label class="form-label" for="hf">From</label><input class="form-control" type="date" id="hf" name="start" value="{{ request.args.get('start','') }}"></div>
+  <div class="col-md-2"><label class="form-label" for="ht">To</label><input class="form-control" type="date" id="ht" name="end" value="{{ request.args.get('end','') }}"></div>
+  <div class="col-md-1 d-flex gap-1"><button class="btn btn-primary flex-fill" aria-label="Filter"><i class="bi bi-funnel"></i></button><a class="btn btn-outline-secondary" href="{{ url_for('predictions.history') }}" aria-label="Clear"><i class="bi bi-x-lg"></i></a></div>
+</form>
+<div class="card-x">
+  <div class="card-head"><h2>{{ total }} prediction{{ 's' if total != 1 }}</h2><a class="btn btn-sm btn-outline-primary no-print" href="{{ url_for('predictions.history_csv', **request.args.to_dict()) }}"><i class="bi bi-download me-1"></i>Export CSV</a></div>
+  {% if history %}<div class="table-responsive"><table class="table table-x align-middle"><thead><tr><th>Predicted at</th>{% if faculty %}<th>Student</th>{% endif %}<th>Course</th><th>Score</th><th>Risk</th><th>Method</th><th>Model</th></tr></thead><tbody>
+    {% for p in history %}<tr><td>{{ p.predicted_at|dt }}</td>{% if faculty %}<td>{{ p.student_name }}</td>{% endif %}<td>{{ p.course_name }}</td><td class="fw-semibold">{{ p.engagement_score|num(1) }}</td><td>{{ risk(p.risk_level) }}</td><td>{{ 'ML model' if p.method == 'ml_model' else 'Rule baseline' }}</td><td><small class="text-muted">{{ p.model_version or '-' }}</small></td></tr>{% endfor %}
+  </tbody></table></div>{{ table_footer(page, total, per_page, 'prediction') }}
+  {% else %}{{ empty('clock-history', 'No predictions match', 'Run predictions from the Predictions page.' if faculty else 'Your faculty has not generated predictions yet.') }}{% endif %}
+</div>
+{% endblock %}

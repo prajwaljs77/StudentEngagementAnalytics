@@ -1,0 +1,13 @@
+student_email,course_name,assessment_type,title,score,due_at,submitted_at,assessed_at
+student01@example.edu,Data Structures,quiz,Imported Quiz A,44,,,2026-10-11 04:47
+student01@example.edu,Data Structures,assignment,Imported Assignment A,96,2026-10-10 04:47,2026-10-11 17:47,2026-10-12 04:47
+student01@example.edu,Database Management Systems,quiz,Imported Quiz A,56,,,2026-10-11 04:47
+student01@example.edu,Database Management Systems,assignment,Imported Assignment A,52,2026-10-10 04:47,2026-10-10 13:47,2026-10-12 04:47
+student02@example.edu,Database Management Systems,quiz,Imported Quiz A,42,,,2026-10-11 04:47
+student02@example.edu,Database Management Systems,assignment,Imported Assignment A,92,2026-10-10 04:47,2026-10-11 04:47,2026-10-12 04:47
+student02@example.edu,Machine Learning Fundamentals,quiz,Imported Quiz A,72,,,2026-10-11 04:47
+student02@example.edu,Machine Learning Fundamentals,assignment,Imported Assignment A,57,2026-10-10 04:47,2026-10-10 20:47,2026-10-12 04:47
+student03@example.edu,Machine Learning Fundamentals,quiz,Imported Quiz A,50,,,2026-10-11 04:47
+student03@example.edu,Machine Learning Fundamentals,assignment,Imported Assignment A,85,2026-10-10 04:47,2026-10-10 20:47,2026-10-12 04:47
+student03@example.edu,Web Technologies,quiz,Imported Quiz A,41,,,2026-10-11 04:47
+student03@example.edu,Web Technologies,assignment,Imported Assignment A,58,2026-10-10 04:47,2026-10-11 06:47,2026-10-12 04:47

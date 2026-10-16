@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, empty, table_footer, risk, status as st with context %}
+{% block title %}Early-warning alerts{% endblock %}
+{% block content %}
+<div class="alert alert-info small" role="note"><i class="bi bi-info-circle me-1"></i>Alerts highlight students who may benefit from <strong>supportive</strong> outreach. They are based on documented rules and model estimates and never trigger penalties automatically.</div>
+<div class="card-x card-body-x mb-3 d-flex flex-wrap gap-2 align-items-end justify-content-between">
+  <form class="filters row g-2 align-items-end flex-grow-1" method="get">
+    <div class="col-sm-4 col-md-3"><label class="form-label" for="status">Status</label><select class="form-select" id="status" name="status"><option value="" {{ 'selected' if not status }}>All</option>{% for s in ['open','acknowledged','resolved'] %}<option value="{{ s }}" {{ 'selected' if status == s }}>{{ s|capitalize }}</option>{% endfor %}</select></div>
+    <div class="col-sm-4 col-md-3"><label class="form-label" for="risk">Risk</label><select class="form-select" id="risk" name="risk"><option value="">All</option><option value="high" {{ 'selected' if request.args.get('risk') == 'high' }}>High</option><option value="medium" {{ 'selected' if request.args.get('risk') == 'medium' }}>Medium</option></select></div>
+  </form>
+  <form method="post" action="{{ url_for('alerts.generate') }}" data-confirm="Run predictions for every enrolled student in your courses and create new alerts? Existing open alerts will not be duplicated.">{{ csrf() }}<button class="btn btn-primary" type="submit"><i class="bi bi-arrow-repeat me-1"></i>Generate alerts</button></form>
+</div>
+<div class="card-x">
+  {% if alerts %}<div class="table-responsive"><table class="table table-x align-middle"><thead><tr><th>Student</th><th>Course</th><th>Score</th><th>Risk</th><th>Reason</th><th>Suggested support</th><th>Generated</th><th>Status</th></tr></thead><tbody>
+    {% for a in alerts %}<tr><td><a href="{{ url_for('students.detail', student_id=a.student_id) }}" class="fw-semibold text-decoration-none">{{ a.student_name }}</a><br><small class="text-muted">ID {{ a.student_id }}</small></td><td>{{ a.course_name }}</td><td>{{ a.engagement_score|num(0) }}</td><td>{{ risk(a.risk_level) }}</td>
+      <td style="min-width:220px">{{ a.reason }}</td><td style="min-width:220px">{{ a.suggested_action }}</td><td>{{ a.created_at|dt('%d %b %Y') }}</td>
+      <td><form method="post" action="{{ url_for('alerts.set_status', alert_id=a.alert_id) }}" class="d-flex gap-1">{{ csrf() }}<select name="status" class="form-select form-select-sm" aria-label="Alert status" onchange="this.form.submit()">{% for s in ['open','acknowledged','resolved'] %}<option value="{{ s }}" {{ 'selected' if a.status == s }}>{{ s|capitalize }}</option>{% endfor %}</select></form></td></tr>{% endfor %}
+  </tbody></table></div>{{ table_footer(page, total, per_page, 'alert') }}
+  {% else %}{{ empty('bell-slash', 'No alerts to show', 'Press “Generate alerts” to check your students.') }}{% endif %}
+</div>
+{% endblock %}

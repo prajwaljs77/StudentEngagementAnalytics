@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, empty, table_footer, confirm_form with context %}
+{% block title %}{{ 'Assessments' if current_user.role == 'faculty' else 'My assessments' }}{% endblock %}
+{% block content %}
+{% set faculty = current_user.role == 'faculty' %}
+<div class="row g-3 mb-3">
+  {% for label, val, icon, cls in [('Results', summary.count, 'clipboard2-check', 'i-indigo'), ('Average score', summary.average, 'bullseye', 'i-green'), ('Quiz average', summary.quiz_avg, 'patch-question', 'i-blue'), ('Assignment average', summary.assignment_avg, 'journal-text', 'i-amber')] %}
+  <div class="col-6 col-lg-3"><div class="card-x kpi"><div class="icon {{ cls }}"><i class="bi bi-{{ icon }}"></i></div><div><div class="label">{{ label }}</div><div class="value">{{ val|num(1 if label != 'Results' else 0) }}</div></div></div></div>{% endfor %}
+</div>
+<div class="row g-3 mb-3">
+  <div class="col-lg-7"><div class="card-x h-100"><div class="card-head"><h2><i class="bi bi-graph-up me-2 text-primary"></i>Assessment trend (weekly average)</h2></div><div class="card-body-x"><div class="chart-box sm"><canvas id="chartAssessTrend" role="img" aria-label="Assessment trend"></canvas></div></div></div></div>
+  <div class="col-lg-5"><div class="card-x h-100"><div class="card-head"><h2><i class="bi bi-flag me-2 text-danger"></i>Consistently low scores</h2><small class="text-muted">avg &lt; {{ low_threshold|num(0) }}, 2+ results</small></div>
+    {% if low %}<ul class="list-group list-group-flush">{% for s in low %}<li class="list-group-item d-flex justify-content-between"><span><strong>{{ s.student_name }}</strong><br><small class="text-muted">{{ s.course_name }} &middot; {{ s.count }} results</small></span><span class="badge-risk risk-high align-self-center">{{ s.average }}</span></li>{% endfor %}</ul>
+    {% else %}{{ empty('emoji-smile', 'No students with consistently low scores') }}{% endif %}</div></div>
+</div>
+
+{% if faculty %}
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addModal"><i class="bi bi-plus-lg me-1"></i>Add result</button>
+  <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#importModal"><i class="bi bi-upload me-1"></i>Import CSV</button></div>
+{% endif %}
+<form class="card-x card-body-x filters mb-3 row g-2 align-items-end" method="get">
+  <div class="col-md-4"><label class="form-label" for="q">Search</label><input class="form-control" id="q" name="q" value="{{ request.args.get('q','') }}" placeholder="Student or title"></div>
+  <div class="col-md-3"><label class="form-label" for="fc">Course</label><select class="form-select" id="fc" name="course_id"><option value="">All</option>{% for c in courses %}<option value="{{ c.course_id }}" {{ 'selected' if request.args.get('course_id')|string == c.course_id|string }}>{{ c.course_name }}</option>{% endfor %}</select></div>
+  <div class="col-md-3"><label class="form-label" for="ft">Type</label><select class="form-select" id="ft" name="type"><option value="">All</option>{% for k, v in ASSESSMENT_TYPES.items() %}<option value="{{ k }}" {{ 'selected' if request.args.get('type') == k }}>{{ v }}</option>{% endfor %}</select></div>
+  <div class="col-md-2 d-flex gap-2"><button class="btn btn-primary flex-fill">Filter</button><a class="btn btn-outline-secondary" href="{{ url_for('assessments.index') }}" aria-label="Clear"><i class="bi bi-x-lg"></i></a></div>
+</form>
+<div class="card-x">
+  {% if assessments %}<div class="table-responsive"><table class="table table-x align-middle"><thead><tr><th>Date</th>{% if faculty %}<th>Student</th>{% endif %}<th>Course</th><th>Type</th><th>Title</th><th>Score</th><th>Delay</th>{% if faculty %}<th class="text-end">Actions</th>{% endif %}</tr></thead><tbody>
+  {% for a in assessments %}<tr><td>{{ a.assessed_at|dt('%d %b %Y') }}</td>{% if faculty %}<td>{{ a.student_name }}</td>{% endif %}<td>{{ a.course_name }}</td><td>{{ ASSESSMENT_TYPES[a.assessment_type] }}</td><td>{{ a.title }}</td>
+    <td><span class="fw-semibold {{ 'text-danger' if a.score < low_threshold }}">{{ a.score|num }}</span> / {{ max_score|num(0) }}</td>
+    <td>{% if a.due_at and a.submitted_at %}{% set d = ((a.submitted_at|dt('%Y-%m-%d %H:%M:%S')) > (a.due_at|dt('%Y-%m-%d %H:%M:%S'))) %}{{ 'Late' if d else 'On time' }}{% else %}-{% endif %}</td>
+    {% if faculty %}<td class="text-end"><div class="dropdown"><button class="btn btn-sm btn-light" data-bs-toggle="dropdown" aria-label="Actions"><i class="bi bi-three-dots-vertical"></i></button><ul class="dropdown-menu dropdown-menu-end">
+      <li><button class="dropdown-item" data-edit-target="#editModal" data-action="{{ url_for('assessments.edit', assessment_id=a.assessment_id) }}" data-fields='{{ {"title": a.title, "score": a.score, "assessment_type": a.assessment_type, "due_at": a.due_at|dtinput, "submitted_at": a.submitted_at|dtinput, "assessed_at": a.assessed_at|dtinput}|tojson }}'><i class="bi bi-pencil me-2"></i>Edit</button></li>
+      <li><hr class="dropdown-divider"></li><li>{{ confirm_form(url_for('assessments.delete', assessment_id=a.assessment_id), 'Delete this assessment result?', 'Delete') }}</li></ul></div></td>{% endif %}</tr>{% endfor %}
+  </tbody></table></div>{{ table_footer(page, total, per_page, 'result') }}
+  {% else %}{{ empty('clipboard2', 'No assessment results found', 'Add a quiz or assignment result to begin.' if faculty else '') }}{% endif %}
+</div>
+
+{% if faculty %}
+{% macro aform(modal, title, action, is_new) %}
+<div class="modal fade" id="{{ modal }}" tabindex="-1" aria-labelledby="{{ modal }}L" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-lg"><form class="modal-content needs-validation" method="post" action="{{ action }}" novalidate>{{ csrf() }}
+  <div class="modal-header"><h2 class="modal-title fs-5" id="{{ modal }}L">{{ title }}</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+  <div class="modal-body row g-3">
+    {% if is_new %}<div class="col-md-6"><label class="form-label" for="{{ modal }}c">Course</label><select class="form-select" id="{{ modal }}c" name="course_id" required data-students-for="#{{ modal }}s"><option value="">Select course</option>{% for c in courses %}<option value="{{ c.course_id }}">{{ c.course_name }}</option>{% endfor %}</select></div>
+    <div class="col-md-6"><label class="form-label" for="{{ modal }}s">Student</label><select class="form-select" id="{{ modal }}s" name="student_id" required><option value="">Select a course first</option></select></div>{% endif %}
+    <div class="col-md-4"><label class="form-label" for="{{ modal }}t">Type</label><select class="form-select" id="{{ modal }}t" name="assessment_type" required>{% for k, v in ASSESSMENT_TYPES.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+    <div class="col-md-5"><label class="form-label" for="{{ modal }}ti">Title</label><input class="form-control" id="{{ modal }}ti" name="title" required maxlength="150" placeholder="e.g. Quiz 3"></div>
+    <div class="col-md-3"><label class="form-label" for="{{ modal }}sc">Score (max {{ max_score|num(0) }})</label><input class="form-control" id="{{ modal }}sc" name="score" type="number" step="0.01" min="0" max="{{ max_score }}" required><div class="invalid-feedback">0 to {{ max_score|num(0) }}.</div></div>
+    <div class="col-md-4"><label class="form-label" for="{{ modal }}d">Due (optional)</label><input class="form-control" id="{{ modal }}d" name="due_at" type="datetime-local"></div>
+    <div class="col-md-4"><label class="form-label" for="{{ modal }}su">Submitted (optional)</label><input class="form-control" id="{{ modal }}su" name="submitted_at" type="datetime-local"></div>
+    <div class="col-md-4"><label class="form-label" for="{{ modal }}a">Assessed on</label><input class="form-control" id="{{ modal }}a" name="assessed_at" type="datetime-local"></div>
+    <div class="col-12 form-text">Due date and submission time must be given together; they are used to compute submission delay for the prediction model.</div>
+  </div>
+  <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Save</button></div></form></div></div>
+{% endmacro %}
+{{ aform('addModal', 'Add quiz / assignment result', url_for('assessments.create'), true) }}{{ aform('editModal', 'Edit result', '#', false) }}
+<div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importL" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><form class="modal-content needs-validation" method="post" action="{{ url_for('assessments.import_csv') }}" enctype="multipart/form-data" novalidate>{{ csrf() }}
+  <div class="modal-header"><h2 class="modal-title fs-5" id="importL">Import assessments from CSV</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+  <div class="modal-body"><label class="form-label" for="csvB">CSV file (max {{ config.MAX_UPLOAD_MB }} MB)</label><input class="form-control" id="csvB" type="file" name="file" accept=".csv" required>
+    <div class="form-text mt-2">Required: <code>student_email, course_name, assessment_type, title, score</code>. Optional: <code>due_at, submitted_at, assessed_at</code>. <a href="{{ url_for('static', filename='samples/sample_assessments.csv') }}" download>Download sample</a></div></div>
+  <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Validate &amp; import</button></div></form></div></div>
+{% endif %}
+{% endblock %}
+{% block scripts %}<script>document.addEventListener("DOMContentLoaded",async()=>{const p=new URLSearchParams(location.search);const q=new URLSearchParams();if(p.get("course_id"))q.set("course_id",p.get("course_id"));try{renderAssessmentTrend(await apiFetch("/api/assessments/trend?"+q));}catch(e){toast(e.message,"danger");}});</script>{% endblock %}

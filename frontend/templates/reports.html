@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% from "_macros.html" import empty with context %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+<form class="card-x card-body-x filters mb-3 row g-2 align-items-end no-print" method="get" action="{{ url_for('reports.index') }}" id="reportFilters">
+  <div class="col-md-4"><label class="form-label" for="rc">Course</label><select class="form-select" id="rc" name="course_id"><option value="">All my courses</option>{% for c in courses %}<option value="{{ c.course_id }}" {{ 'selected' if request.args.get('course_id')|string == c.course_id|string }}>{{ c.course_name }}</option>{% endfor %}</select></div>
+  <div class="col-md-3"><label class="form-label" for="rs">From</label><input class="form-control" type="date" id="rs" name="start" value="{{ request.args.get('start','') }}"></div>
+  <div class="col-md-3"><label class="form-label" for="re">To</label><input class="form-control" type="date" id="re" name="end" value="{{ request.args.get('end','') }}"></div>
+  <div class="col-md-2 text-muted small">Filters apply to the report you open.</div>
+</form>
+{% if not report %}
+<div class="row g-3">
+  {% for key, label in reports.items() %}
+  <div class="col-md-6 col-xl-4"><div class="card-x card-body-x h-100 d-flex flex-column"><h2 class="h6"><i class="bi bi-file-earmark-bar-graph text-primary me-2"></i>{{ label }}</h2>
+    <p class="text-muted small flex-grow-1">{{ {'student_engagement':'Latest engagement score and risk level for every enrolled student.','course_performance':'Activity, assessments and engagement summarised per course.','assessment_results':'All quiz and assignment results.','inactive_students':'Students without recent learning activity.','high_risk_students':'Students whose latest prediction is high risk.','activity_trends':'Daily activity volume, active students and study time.','prediction_history':'Every stored prediction with timestamps.'}[key] }}</p>
+    <div class="d-flex gap-2"><a class="btn btn-primary btn-sm report-link" data-base="{{ url_for('reports.view', name=key) }}" href="{{ url_for('reports.view', name=key) }}"><i class="bi bi-eye me-1"></i>View</a>
+    <a class="btn btn-outline-primary btn-sm report-link" data-base="{{ url_for('reports.csv_export', name=key) }}" href="{{ url_for('reports.csv_export', name=key) }}"><i class="bi bi-download me-1"></i>CSV</a></div></div></div>{% endfor %}
+</div>
+{% else %}
+<div class="card-x">
+  <div class="card-head"><div><h2>{{ report.title }} report</h2><small class="text-muted">Generated {{ report.generated_at }} by {{ report.generated_by }} &middot; {{ report.rows|length }} row{{ 's' if report.rows|length != 1 }}</small></div>
+    <div class="d-flex gap-2 no-print"><a class="btn btn-outline-secondary btn-sm" href="{{ url_for('reports.index') }}"><i class="bi bi-arrow-left"></i> All reports</a>
+      <a class="btn btn-outline-primary btn-sm" href="{{ url_for('reports.csv_export', name=report.name, **request.args.to_dict()) }}"><i class="bi bi-download me-1"></i>CSV</a>
+      <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print / Save PDF</button></div></div>
+  {% if report.rows %}<div class="table-responsive"><table class="table table-x table-sm align-middle"><thead><tr>{% for k, label in report.columns %}<th>{{ label }}</th>{% endfor %}</tr></thead><tbody>
+    {% for row in report.rows %}<tr>{% for k, label in report.columns %}<td>{% if k == 'risk' %}<span class="badge-risk risk-{{ row[k] }}">{{ row[k] }}</span>{% elif row[k] is none %}-{% else %}{{ row[k] }}{% endif %}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+  {% else %}{{ empty('file-earmark-x', 'No data for this report', 'Nothing matches the selected filters yet.') }}{% endif %}
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}<script>
+document.addEventListener("DOMContentLoaded",()=>{const f=document.getElementById("reportFilters");if(!f)return;const upd=()=>{const q=new URLSearchParams(new FormData(f));[...q].forEach(([k,v])=>{if(!v)q.delete(k);});document.querySelectorAll(".report-link").forEach(a=>{a.href=a.dataset.base+(q.toString()?"?"+q:"");});};f.addEventListener("change",upd);upd();});
+</script>{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% from "_macros.html" import empty, risk with context %}
+{% block title %}{{ 'Engagement predictions' if current_user.role == 'faculty' else 'My engagement' }}{% endblock %}
+{% block content %}
+{% set faculty = current_user.role == 'faculty' %}
+{% if not status.available %}<div class="alert alert-warning" role="alert"><i class="bi bi-exclamation-triangle me-2"></i><strong>No trained model available.</strong> {{ status.message }} Until then a transparent <em>rule-based baseline</em> (not machine learning) is used and labelled as such.</div>{% endif %}
+<div class="row g-3 mb-3">
+  {% if faculty %}
+  <div class="col-lg-5"><div class="card-x h-100"><div class="card-head"><h2><i class="bi bi-cpu me-2 text-primary"></i>Run an engagement prediction</h2></div>
+    <form class="card-body-x needs-validation" id="predForm" novalidate>
+      <div class="mb-3"><label class="form-label" for="pCourse">Course</label><select class="form-select" id="pCourse" required data-students-for="#pStudent"><option value="">Select course</option>{% for c in courses %}<option value="{{ c.course_id }}">{{ c.course_name }}</option>{% endfor %}</select><div class="invalid-feedback">Choose a course.</div></div>
+      <div class="mb-3"><label class="form-label" for="pStudent">Student</label><select class="form-select" id="pStudent" required><option value="">Select a course first</option></select><div class="invalid-feedback">Choose a student.</div></div>
+      <div class="d-flex gap-2 flex-wrap"><button class="btn btn-primary" type="submit" id="predBtn"><i class="bi bi-play-fill me-1"></i>Predict engagement</button>
+        <button class="btn btn-outline-primary" type="button" id="batchBtn"><i class="bi bi-people me-1"></i>Predict whole course</button></div>
+      <p class="form-text mt-3 mb-0">Each prediction is stored in the database with a timestamp and appears in the history.</p>
+    </form></div></div>
+  {% endif %}
+  <div class="col-lg-{{ 7 if faculty else 8 }}"><div class="card-x h-100" id="resultCard"><div class="card-head"><h2><i class="bi bi-clipboard-pulse me-2 text-primary"></i>Prediction result</h2></div>
+    <div class="card-body-x" id="resultBody">{{ empty('graph-up-arrow', 'No prediction run yet' if faculty else 'See your latest results below', 'Choose a course and student, then press “Predict engagement”.' if faculty else '') }}</div></div></div>
+  {% if not faculty %}<div class="col-lg-4"><div class="card-x h-100 card-body-x small"><strong>How to read this</strong><p class="mt-2">Your engagement score (0-100) is an estimate of how actively you are likely to take part in the next two weeks, based on your recent learning activity and assessments. It is meant to help your faculty offer support - not to judge you.</p></div></div>{% endif %}
+</div>
+
+<div class="card-x mb-3"><div class="card-head"><h2>{{ 'Latest prediction per student and course' if faculty else 'My latest predictions' }}</h2></div>
+  {% if latest %}<div class="table-responsive"><table class="table table-x align-middle"><thead><tr><th>Student</th><th>Course</th><th>Score</th><th>Risk</th><th>Method</th><th>When</th></tr></thead><tbody>
+    {% for p in latest %}<tr><td>{{ p.student_name }}</td><td>{{ p.course_name }}</td><td class="fw-semibold">{{ p.engagement_score|num(1) }}</td><td>{{ risk(p.risk_level) }}</td><td><small>{{ 'ML model' if p.method == 'ml_model' else 'Rule baseline' }}</small></td><td>{{ p.predicted_at|dt }}</td></tr>{% endfor %}</tbody></table></div>
+  {% else %}{{ empty('inbox', 'No predictions stored yet') }}{% endif %}</div>
+
+<div class="row g-3">
+  <div class="col-lg-6"><div class="card-x h-100"><div class="card-head"><h2><i class="bi bi-info-circle me-2 text-primary"></i>How scores and risk levels work</h2></div><div class="card-body-x small">
+    <p>The classifier predicts the probability that a learner will have <strong>low / medium / high</strong> engagement in the <em>next 14 days</em>, using the previous 28 days of activity and recent assessments.</p>
+    <p class="mb-2"><code>score = 100 &times; (0.5 &times; P(medium) + 1.0 &times; P(high))</code></p>
+    <ul class="mb-2"><li><span class="badge-risk risk-high">High risk</span> score &lt; {{ high_below|num(0) }}</li><li><span class="badge-risk risk-medium">Medium risk</span> {{ high_below|num(0) }} &le; score &lt; {{ medium_below|num(0) }}</li><li><span class="badge-risk risk-low">Low risk</span> score &ge; {{ medium_below|num(0) }}</li></ul>
+    <p class="mb-0 text-muted">Thresholds are configurable in <code>.env</code>. Predictions are decision-support estimates only.</p></div></div></div>
+  <div class="col-lg-6"><div class="card-x h-100"><div class="card-head"><h2><i class="bi bi-speedometer me-2 text-primary"></i>Model status &amp; evaluation</h2></div><div class="card-body-x small">
+    {% if status.available %}<p><strong>Model:</strong> {{ status.model_name }} &middot; version {{ status.version }}<br><strong>Trained:</strong> {{ status.trained_at }}</p>{% else %}<p class="text-danger">Model not loaded.</p>{% endif %}
+    {% if metrics %}<p class="mb-1"><strong>Held-out test results</strong> ({{ metrics.test_rows }} rows, synthetic data):</p>
+      <ul class="mb-2"><li>Accuracy {{ metrics.test_metrics.accuracy }}, macro precision {{ metrics.test_metrics.precision_macro }}, macro recall {{ metrics.test_metrics.recall_macro }}, macro F1 {{ metrics.test_metrics.f1_macro }}</li>
+      <li>Rule-based baseline macro F1: {{ metrics.rule_based_baseline_test_metrics.f1_macro }}</li></ul>
+      <p class="text-muted mb-0">These figures describe a simulation. Real-world accuracy must be validated on real institutional data before relying on it.</p>
+    {% else %}<p class="text-muted mb-0">No evaluation file found. Run <code>python -m ml.train_model</code>.</p>{% endif %}</div></div></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  const form = document.getElementById("predForm"); if (!form) return;
+  const body = document.getElementById("resultBody");
+  const COL = {low:"#059669", medium:"#d97706", high:"#dc2626"};
+  function render(r){
+    const ind = r.indicators.map(i => '<li><span class="badge ' + (i.weight < 0 ? "text-bg-danger" : i.weight > 0 ? "text-bg-success" : "text-bg-secondary") + ' me-1">' + (i.weight < 0 ? "&darr;" : i.weight > 0 ? "&uarr;" : "&bull;") + '</span>' + escapeHtml(i.label) + ": <strong>" + escapeHtml(i.value) + "</strong> " + escapeHtml(i.unit) + ' <small class="text-muted">(' + escapeHtml(i.effect) + ")</small></li>").join("");
+    const rec = r.recommendations.map(t => "<li>" + escapeHtml(t) + "</li>").join("");
+    const warn = r.warnings.map(w => '<div class="alert alert-warning py-2 small">' + escapeHtml(w) + "</div>").join("");
+    body.innerHTML = warn + '<div class="row g-3 align-items-center"><div class="col-md-4 text-center"><div class="score-ring" style="--p:' + r.engagement_score + ';--c:' + COL[r.risk_level] + '"><div>' + Math.round(r.engagement_score) + '<small>of 100</small></div></div>' +
+      '<div class="mt-2"><span class="badge-risk risk-' + r.risk_level + '">' + r.risk_level + ' risk</span></div></div>' +
+      '<div class="col-md-8"><h3 class="h6">Main contributing indicators</h3><ul class="list-unstyled small mb-3">' + ind + '</ul><h3 class="h6">Suggested supportive actions</h3><ul class="small mb-2">' + rec + '</ul></div></div>' +
+      '<hr><div class="small text-muted d-flex flex-wrap gap-3"><span><i class="bi bi-clock me-1"></i>' + escapeHtml(r.predicted_at) + '</span><span><i class="bi bi-cpu me-1"></i>' + (r.method === "ml_model" ? "ML model " + escapeHtml(r.model_version) : "Rule-based baseline (not ML)") + '</span><span>Saved as prediction #' + r.prediction_id + '</span></div><p class="small text-muted mt-2 mb-0">' + escapeHtml(r.disclaimer) + "</p>";
+  }
+  form.addEventListener("submit", async e => {
+    e.preventDefault(); if (!form.checkValidity()) { form.classList.add("was-validated"); return; }
+    const btn = document.getElementById("predBtn"); btn.disabled = true;
+    body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><div class="mt-2 text-muted">Calculating&hellip;</div></div>';
+    try { const d = await apiFetch("/api/predictions/run", {json:{student_id:document.getElementById("pStudent").value, course_id:document.getElementById("pCourse").value}}); render(d.result); }
+    catch (err) { body.innerHTML = '<div class="alert alert-danger mb-0">' + escapeHtml(err.message) + "</div>"; }
+    btn.disabled = false;
+  });
+  document.getElementById("batchBtn").addEventListener("click", async () => {
+    const c = document.getElementById("pCourse").value; if (!c) { toast("Choose a course first.", "warning"); return; }
+    showLoading(true);
+    try { const d = await apiFetch("/api/predictions/batch", {json:{course_id:c}}); toast("Predicted " + d.predicted + " student(s)" + (d.failed ? ", " + d.failed + " failed" : "") + ". Reloading...", "success"); setTimeout(() => location.reload(), 900); }
+    catch (err) { toast(err.message, "danger"); } showLoading(false);
+  });
+})();
+</script>
+{% endblock %}

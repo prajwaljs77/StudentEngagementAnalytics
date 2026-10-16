@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, empty, table_footer, confirm_form, risk, source with context %}
+{% block title %}{{ 'Learning history' if detail else 'Students' }}{% endblock %}
+{% block content %}
+{% set faculty = current_user.role == 'faculty' %}
+{% if detail %}
+  {% if faculty %}<nav class="mb-3"><a href="{{ url_for('students.index') }}"><i class="bi bi-arrow-left"></i> All students</a></nav>{% endif %}
+  <div class="card-x card-body-x mb-3 d-flex align-items-center gap-3 flex-wrap"><span class="avatar" style="width:56px;height:56px;font-size:1.4rem">{{ student.name[:1]|upper }}</span>
+    <div><h2 class="h4 mb-0">{{ student.name }}</h2><div class="text-muted">{{ student.email }} &middot; joined {{ student.created_at|dt('%d %b %Y') }}</div></div></div>
+  <div class="row g-3 mb-3">
+    <div class="col-lg-6"><div class="card-x h-100"><div class="card-head"><h2>Courses &amp; latest engagement</h2></div>
+      {% if courses %}<div class="table-responsive"><table class="table table-x"><thead><tr><th>Course</th><th>Score</th><th>Risk</th></tr></thead><tbody>
+        {% for c in courses %}{% set p = predictions|selectattr('course_id','equalto',c.course_id)|first %}<tr><td>{{ c.course_name }}</td>
+          <td>{{ p.engagement_score|num(0) if p else '-' }}</td><td>{% if p %}{{ risk(p.risk_level) }}{% else %}<span class="text-muted small">Not predicted</span>{% endif %}</td></tr>{% endfor %}
+      </tbody></table></div>{% else %}{{ empty('journal', 'No courses in your scope') }}{% endif %}</div></div>
+    <div class="col-lg-6"><div class="card-x h-100"><div class="card-head"><h2>Daily learning minutes (last 30 active days)</h2></div><div class="card-body-x"><div class="chart-box sm"><canvas id="chartStudentDaily" role="img" aria-label="Daily learning minutes"></canvas></div></div></div></div>
+  </div>
+  <div class="row g-3">
+    <div class="col-lg-6"><div class="card-x"><div class="card-head"><h2>Recent activities</h2></div>
+      {% if activities %}<div class="table-responsive"><table class="table table-x"><thead><tr><th>When</th><th>Course</th><th>Type</th><th>Min</th><th>Source</th></tr></thead><tbody>
+      {% for a in activities %}<tr><td>{{ a.activity_time|dt }}</td><td>{{ a.course_name }}</td><td>{{ ACTIVITY_TYPES[a.activity_type] }}</td><td>{{ a.duration }}</td><td>{{ source(a.source) }}</td></tr>{% endfor %}</tbody></table></div>
+      {% else %}{{ empty('activity', 'No activities recorded') }}{% endif %}</div></div>
+    <div class="col-lg-6"><div class="card-x"><div class="card-head"><h2>Recent assessments</h2></div>
+      {% if assessments %}<div class="table-responsive"><table class="table table-x"><thead><tr><th>Title</th><th>Course</th><th>Type</th><th>Score</th></tr></thead><tbody>
+      {% for a in assessments %}<tr><td>{{ a.title }}</td><td>{{ a.course_name }}</td><td>{{ ASSESSMENT_TYPES[a.assessment_type] }}</td><td>{{ a.score|num }}</td></tr>{% endfor %}</tbody></table></div>
+      {% else %}{{ empty('clipboard2', 'No assessments recorded') }}{% endif %}</div></div>
+  </div>
+{% else %}
+  <form class="card-x card-body-x filters mb-3 row g-2 align-items-end" method="get">
+    <div class="col-md-5"><label class="form-label" for="q">Search</label><input class="form-control" id="q" name="q" value="{{ request.args.get('q','') }}" placeholder="Name or email"></div>
+    <div class="col-md-3"><label class="form-label" for="course_id">Course</label><select class="form-select" id="course_id" name="course_id"><option value="">All my courses</option>{% for c in courses %}<option value="{{ c.course_id }}" {{ 'selected' if request.args.get('course_id')|string == c.course_id|string }}>{{ c.course_name }}</option>{% endfor %}</select></div>
+    <div class="col-md-4 d-flex gap-2"><button class="btn btn-primary"><i class="bi bi-search me-1"></i>Search</button><a class="btn btn-outline-secondary" href="{{ url_for('students.index') }}">Clear</a>
+      <button class="btn btn-success ms-auto" type="button" data-bs-toggle="modal" data-bs-target="#createModal"><i class="bi bi-person-plus me-1"></i>Add student</button></div>
+  </form>
+  <div class="card-x">
+    {% if students %}<div class="table-responsive"><table class="table table-x align-middle"><thead><tr><th>Name</th><th>Email</th><th>Courses</th><th>Last activity</th><th class="text-end">Actions</th></tr></thead><tbody>
+      {% for s in students %}<tr><td class="fw-semibold">{{ s.name }}</td><td>{{ s.email }}</td><td><span class="badge text-bg-light border">{{ s.course_count }}</span></td><td>{{ s.last_activity|dt if s.last_activity else 'Never' }}</td>
+        <td class="text-end"><div class="dropdown"><button class="btn btn-sm btn-light" data-bs-toggle="dropdown" aria-label="Actions for {{ s.name }}"><i class="bi bi-three-dots-vertical"></i></button><ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" href="{{ url_for('students.detail', student_id=s.user_id) }}"><i class="bi bi-clock-history me-2"></i>Learning history</a></li>
+          <li><button class="dropdown-item" data-edit-target="#editModal" data-action="{{ url_for('students.edit', student_id=s.user_id) }}" data-fields='{{ {"name": s.name, "email": s.email}|tojson }}'><i class="bi bi-pencil me-2"></i>Edit</button></li>
+          <li><hr class="dropdown-divider"></li><li>{{ confirm_form(url_for('students.delete', student_id=s.user_id), 'Delete student ' ~ s.name ~ '? Students with learning records cannot be deleted.', 'Delete') }}</li></ul></div></td></tr>{% endfor %}
+    </tbody></table></div>{{ table_footer(page, total, per_page, 'student') }}
+    {% else %}{{ empty('people', 'No students found', 'Add a student or ask students to register.') }}{% endif %}
+  </div>
+  {% macro sform(modal, title, action, pwreq) %}
+  <div class="modal fade" id="{{ modal }}" tabindex="-1" aria-labelledby="{{ modal }}L" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><form class="modal-content needs-validation" method="post" action="{{ action }}" novalidate>{{ csrf() }}
+    <div class="modal-header"><h2 class="modal-title fs-5" id="{{ modal }}L">{{ title }}</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+    <div class="modal-body">
+      <div class="mb-3"><label class="form-label" for="{{ modal }}n">Full name</label><input class="form-control" id="{{ modal }}n" name="name" required minlength="2" maxlength="100"><div class="invalid-feedback">Name is required.</div></div>
+      <div class="mb-3"><label class="form-label" for="{{ modal }}e">Email</label><input class="form-control" id="{{ modal }}e" name="email" type="email" required maxlength="150"><div class="invalid-feedback">Enter a valid email.</div></div>
+      <div class="mb-3"><label class="form-label" for="{{ modal }}p">Password {{ '' if pwreq else '(leave blank to keep)' }}</label><input class="form-control" id="{{ modal }}p" name="password" type="password" minlength="8" autocomplete="new-password" {{ 'required' if pwreq }}><div class="invalid-feedback">At least 8 characters with a letter and number.</div></div>
+    </div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Save</button></div></form></div></div>
+  {% endmacro %}
+  {{ sform('createModal', 'Add student', url_for('students.create'), true) }}{{ sform('editModal', 'Edit student', '#', false) }}
+{% endif %}
+{% endblock %}
+{% block scripts %}{% if detail %}<script>document.addEventListener("DOMContentLoaded",()=>renderStudentChart({{ chart.labels|tojson }},{{ chart.minutes|tojson }}));</script>{% endif %}{% endblock %}

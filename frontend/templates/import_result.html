@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Import result{% endblock %}
+{% block content %}
+<div class="card-x"><div class="card-head"><h2>Import summary: {{ kind }}</h2><a class="btn btn-primary btn-sm" href="{{ back }}">Back</a></div>
+<div class="card-body-x"><div class="row g-3 mb-3 text-center">
+  <div class="col-4"><div class="fs-3 fw-bold">{{ summary.total }}</div><div class="text-muted small">Rows read</div></div>
+  <div class="col-4"><div class="fs-3 fw-bold text-success">{{ summary.imported }}</div><div class="text-muted small">Imported</div></div>
+  <div class="col-4"><div class="fs-3 fw-bold text-danger">{{ summary.rejected }}</div><div class="text-muted small">Rejected</div></div></div>
+{% if summary.errors %}<h3 class="h6">Rejected rows</h3><div class="table-responsive"><table class="table table-x table-sm"><thead><tr><th>CSV line</th><th>Reason</th></tr></thead><tbody>
+  {% for e in summary.errors %}<tr><td>{{ e.line }}</td><td>{{ e.error }}</td></tr>{% endfor %}</tbody></table></div>
+  {% if summary.more_errors %}<p class="text-muted small">&hellip; and {{ summary.more_errors }} more.</p>{% endif %}
+{% else %}<div class="alert alert-success mb-0">All rows were valid.</div>{% endif %}</div></div>
+{% endblock %}

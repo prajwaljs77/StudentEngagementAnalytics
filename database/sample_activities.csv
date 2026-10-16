@@ -1,0 +1,25 @@
+student_email,course_name,activity_type,duration,activity_time
+student01@example.edu,Data Structures,video,26,2026-10-12 03:40
+student01@example.edu,Data Structures,study_session,48,2026-10-14 02:39
+student01@example.edu,Data Structures,material,22,2026-10-14 01:38
+student01@example.edu,Data Structures,login,0,2026-10-12 00:37
+student01@example.edu,Database Management Systems,video,25,2026-10-13 03:40
+student01@example.edu,Database Management Systems,study_session,49,2026-10-14 02:39
+student01@example.edu,Database Management Systems,material,19,2026-10-13 01:38
+student01@example.edu,Database Management Systems,login,0,2026-10-13 00:37
+student02@example.edu,Database Management Systems,video,27,2026-10-14 03:40
+student02@example.edu,Database Management Systems,study_session,56,2026-10-12 02:39
+student02@example.edu,Database Management Systems,material,11,2026-10-14 01:38
+student02@example.edu,Database Management Systems,login,0,2026-10-13 00:37
+student02@example.edu,Machine Learning Fundamentals,video,38,2026-10-13 03:40
+student02@example.edu,Machine Learning Fundamentals,study_session,51,2026-10-13 02:39
+student02@example.edu,Machine Learning Fundamentals,material,19,2026-10-13 01:38
+student02@example.edu,Machine Learning Fundamentals,login,0,2026-10-13 00:37
+student03@example.edu,Machine Learning Fundamentals,video,36,2026-10-14 03:40
+student03@example.edu,Machine Learning Fundamentals,study_session,59,2026-10-12 02:39
+student03@example.edu,Machine Learning Fundamentals,material,14,2026-10-12 01:38
+student03@example.edu,Machine Learning Fundamentals,login,0,2026-10-14 00:37
+student03@example.edu,Web Technologies,video,34,2026-10-13 03:40
+student03@example.edu,Web Technologies,study_session,58,2026-10-12 02:39
+student03@example.edu,Web Technologies,material,24,2026-10-14 01:38
+student03@example.edu,Web Technologies,login,0,2026-10-14 00:37

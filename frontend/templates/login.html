@@ -1,0 +1,24 @@
+{% extends "auth_base.html" %}
+{% block title %}Log in{% endblock %}
+{% block content %}
+<h1 class="h3 fw-bold mb-1">Welcome back</h1>
+<p class="text-muted mb-4">Log in to your learning analytics workspace.</p>
+<form method="post" class="needs-validation" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="mb-3">
+    <label class="form-label" for="email">Email address</label>
+    <input class="form-control form-control-lg" id="email" name="email" type="email" autocomplete="username" required maxlength="150" value="{{ request.form.get('email','') }}">
+    <div class="invalid-feedback">Please enter a valid email address.</div>
+  </div>
+  <div class="mb-4">
+    <label class="form-label" for="password">Password</label>
+    <div class="input-group">
+      <input class="form-control form-control-lg" id="password" name="password" type="password" autocomplete="current-password" required>
+      <button class="btn btn-outline-secondary" type="button" data-toggle-password="#password" aria-label="Show or hide password"><i class="bi bi-eye"></i></button>
+      <div class="invalid-feedback">Password is required.</div>
+    </div>
+  </div>
+  <button class="btn btn-primary btn-lg w-100" type="submit">Log in</button>
+</form>
+<p class="text-center mt-4 mb-0">New here? <a href="{{ url_for('auth.register') }}">Create an account</a></p>
+{% endblock %}

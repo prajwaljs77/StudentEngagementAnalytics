@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+{% set faculty = current_user.role == 'faculty' %}
+<form id="filterForm" class="card-x card-body-x filters mb-4 row g-2 align-items-end" onsubmit="return false">
+  <div class="col-6 col-md-2"><label class="form-label" for="fStart">From</label><input class="form-control" type="date" id="fStart" value="{{ default_start }}"></div>
+  <div class="col-6 col-md-2"><label class="form-label" for="fEnd">To</label><input class="form-control" type="date" id="fEnd" value="{{ default_end }}"></div>
+  <div class="col-12 col-md-3"><label class="form-label" for="fCourse">Course</label>
+    <select class="form-select" id="fCourse"><option value="">All courses</option>{% for c in courses %}<option value="{{ c.course_id }}">{{ c.course_name }}</option>{% endfor %}</select></div>
+  {% if faculty %}<div class="col-12 col-md-3"><label class="form-label" for="fStudent">Student</label>
+    <select class="form-select" id="fStudent"><option value="">All students</option>{% for s in students %}<option value="{{ s.user_id }}">{{ s.name }}</option>{% endfor %}</select></div>{% endif %}
+  <div class="col-12 col-md-2 d-flex gap-2"><button class="btn btn-primary flex-fill" id="applyBtn" type="button"><i class="bi bi-funnel me-1"></i>Apply</button>
+    <button class="btn btn-outline-secondary" id="resetBtn" type="button" title="Reset filters" aria-label="Reset filters"><i class="bi bi-arrow-counterclockwise"></i></button></div>
+</form>
+
+<div id="dashError" class="alert alert-danger d-none" role="alert"></div>
+<div id="dashEmpty" class="card-x mb-4 d-none"><div class="empty"><i class="bi bi-inbox"></i><div class="fw-semibold text-body">No learning data yet</div>
+  <div class="small">{% if faculty %}Create a course, enrol students and record or import learning activities. Then run predictions.{% else %}Your faculty has not recorded any learning data for you yet.{% endif %}</div></div></div>
+
+<div class="row g-3 mb-4" id="kpiRow">
+  {% set kpis = [('total_students','people','i-indigo','Registered students'),('total_courses','journal-bookmark','i-blue','Courses'),
+     ('total_activities','activity','i-cyan','Learning activities'),('avg_assessment_score','clipboard2-check','i-green','Avg assessment score'),
+     ('avg_engagement_score','graph-up-arrow','i-indigo','Avg engagement score'),('inactive_students','person-dash','i-amber','Inactive students'),
+     ('high_risk_students','exclamation-octagon','i-red','High-risk students')] %}
+  {% for key, icon, cls, label in kpis %}
+  <div class="col-6 col-md-4 col-xl-3"><div class="card-x kpi"><div class="icon {{ cls }}"><i class="bi bi-{{ icon }}"></i></div>
+    <div><div class="label">{{ label if faculty or key not in ('total_students',) else 'You' }}</div><div class="value skeleton" id="kpi_{{ key }}">0000</div></div></div></div>
+  {% endfor %}
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-xl-7"><div class="card-x h-100"><div class="card-head"><h2><i class="bi bi-bar-chart-line me-2 text-primary"></i>Course-wise engagement</h2></div><div class="card-body-x"><div class="chart-box"><canvas id="chartCourse" role="img" aria-label="Course-wise engagement chart"></canvas></div></div></div></div>
+  <div class="col-xl-5"><div class="card-x h-100"><div class="card-head"><h2><i class="bi bi-pie-chart me-2 text-primary"></i>Engagement risk distribution</h2></div><div class="card-body-x"><div class="chart-box"><canvas id="chartRisk" role="img" aria-label="Risk distribution chart"></canvas></div></div></div></div>
+</div>
+<div class="row g-3 mb-3">
+  <div class="col-xl-7"><div class="card-x h-100"><div class="card-head"><h2><i class="bi bi-graph-up me-2 text-primary"></i>Learning activity trend</h2><small class="text-muted" id="trendGran"></small></div><div class="card-body-x"><div class="chart-box"><canvas id="chartTrend" role="img" aria-label="Activity trend chart"></canvas></div></div></div></div>
+  <div class="col-xl-5"><div class="card-x h-100"><div class="card-head"><h2><i class="bi bi-clipboard-data me-2 text-primary"></i>Quiz &amp; assignment performance</h2></div><div class="card-body-x"><div class="chart-box"><canvas id="chartAssess" role="img" aria-label="Assessment performance chart"></canvas></div></div></div></div>
+</div>
+<div class="row g-3 mb-4">
+  <div class="col-12"><div class="card-x"><div class="card-head"><h2><i class="bi bi-people me-2 text-primary"></i>Student activity comparison (top 10 by learning time)</h2></div><div class="card-body-x"><div class="chart-box sm"><canvas id="chartStudents" role="img" aria-label="Student comparison chart"></canvas></div></div></div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-4"><div class="card-x h-100"><div class="card-head"><h2><i class="bi bi-eye me-2 text-primary"></i>Descriptive: what happened</h2></div><div class="card-body-x"><ul class="insight-list" id="insDesc"><li class="skeleton">Loading insights...</li></ul></div></div></div>
+  <div class="col-lg-4"><div class="card-x h-100"><div class="card-head"><h2><i class="bi bi-search me-2 text-primary"></i>Diagnostic: possible reasons</h2></div><div class="card-body-x"><ul class="insight-list" id="insDiag"><li class="skeleton">Loading insights...</li></ul></div></div></div>
+  <div class="col-lg-4"><div class="card-x h-100"><div class="card-head"><h2><i class="bi bi-lightning-charge me-2 text-primary"></i>Predictive: what may happen next</h2></div><div class="card-body-x"><ul class="insight-list" id="insPred"><li class="skeleton">Loading insights...</li></ul>
+    <p class="text-muted small mt-3 mb-0">Predictions are decision-support estimates, not judgments about individual students.</p></div></div></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const fmt = (v, d=0) => v === null || v === undefined ? "—" : Number(v).toFixed(d).replace(/\.0+$/, "");
+  const lists = (id, arr) => $(id).innerHTML = arr.map(t => "<li>" + escapeHtml(t) + "</li>").join("");
+  async function load(){
+    const p = new URLSearchParams({start:$("fStart").value, end:$("fEnd").value});
+    if ($("fCourse").value) p.set("course_id", $("fCourse").value);
+    if ($("fStudent") && $("fStudent").value) p.set("student_id", $("fStudent").value);
+    $("dashError").classList.add("d-none");
+    document.querySelectorAll(".kpi .value").forEach(e => e.classList.add("skeleton"));
+    try {
+      const d = await apiFetch("/api/dashboard?" + p.toString());
+      const k = d.kpis;
+      const map = {total_students:fmt(k.total_students), total_courses:fmt(k.total_courses), total_activities:fmt(k.total_activities),
+        avg_assessment_score:fmt(k.avg_assessment_score,1), avg_engagement_score:fmt(k.avg_engagement_score,1),
+        inactive_students:fmt(k.inactive_students), high_risk_students:fmt(k.high_risk_students)};
+      Object.keys(map).forEach(key => { const el = $("kpi_" + key); el.textContent = map[key]; el.classList.remove("skeleton"); });
+      $("dashEmpty").classList.toggle("d-none", !d.empty);
+      renderDashboardCharts(d.charts);
+      $("trendGran").textContent = d.charts.activity_trend.granularity + " view";
+      lists("insDesc", d.insights.descriptive); lists("insDiag", d.insights.diagnostic); lists("insPred", d.insights.predictive);
+    } catch (e) {
+      document.querySelectorAll(".kpi .value").forEach(el => { el.textContent = "—"; el.classList.remove("skeleton"); });
+      $("dashError").textContent = e.message; $("dashError").classList.remove("d-none");
+    }
+  }
+  $("applyBtn").addEventListener("click", load);
+  $("resetBtn").addEventListener("click", () => { $("fStart").value = "{{ default_start }}"; $("fEnd").value = "{{ default_end }}"; $("fCourse").value = ""; if ($("fStudent")) $("fStudent").value = ""; load(); });
+  ["fCourse","fStudent"].forEach(id => $(id) && $(id).addEventListener("change", load));
+  document.addEventListener("DOMContentLoaded", load);
+})();
+</script>
+{% endblock %}

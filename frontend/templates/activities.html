@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, empty, table_footer, confirm_form, source with context %}
+{% block title %}{{ 'Learning activities' if current_user.role == 'faculty' else 'My activities' }}{% endblock %}
+{% block content %}
+{% set faculty = current_user.role == 'faculty' %}
+<div class="row g-3 mb-3">
+  <div class="col-lg-{{ 8 if faculty else 12 }}"><div class="card-x h-100"><div class="card-head"><h2><i class="bi bi-plus-circle me-2 text-primary"></i>Record a learning activity</h2></div>
+    <form class="card-body-x row g-2 needs-validation" method="post" action="{{ url_for('activities.create') }}" novalidate>{{ csrf() }}
+      <div class="col-md-4"><label class="form-label" for="a_course">Course</label><select class="form-select" id="a_course" name="course_id" required {% if faculty %}data-students-for="#a_student"{% endif %}><option value="">Select course</option>{% for c in courses %}<option value="{{ c.course_id }}">{{ c.course_name }}</option>{% endfor %}</select><div class="invalid-feedback">Choose a course.</div></div>
+      {% if faculty %}<div class="col-md-4"><label class="form-label" for="a_student">Student</label><select class="form-select" id="a_student" name="student_id" required><option value="">Select a course first</option></select><div class="invalid-feedback">Choose a student.</div></div>{% endif %}
+      <div class="col-md-4"><label class="form-label" for="a_type">Activity type</label><select class="form-select" id="a_type" name="activity_type" required>{% for k, v in ACTIVITY_TYPES.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+      <div class="col-md-4"><label class="form-label" for="a_dur">Duration (minutes)</label><input class="form-control" id="a_dur" name="duration" type="number" min="0" max="1440" step="1" required value="30"><div class="invalid-feedback">Enter 0-1440 minutes (at least 1 except for logins).</div></div>
+      <div class="col-md-4"><label class="form-label" for="a_time">Date &amp; time</label><input class="form-control" id="a_time" name="activity_time" type="datetime-local" required value="{{ now }}" max="{{ now }}"><div class="invalid-feedback">Pick a date and time that is not in the future.</div></div>
+      <div class="col-md-4 d-flex align-items-end"><button class="btn btn-primary w-100" type="submit"><i class="bi bi-check2 me-1"></i>Save activity</button></div>
+      <div class="col-12 form-text">Records saved here are marked <span class="src-badge">Manual</span>. Real logins are captured automatically as <span class="src-badge src-system">System</span> events.</div>
+    </form></div></div>
+  {% if faculty %}<div class="col-lg-4"><div class="card-x h-100"><div class="card-head"><h2><i class="bi bi-upload me-2 text-primary"></i>Import from CSV</h2></div>
+    <form class="card-body-x needs-validation" method="post" action="{{ url_for('activities.import_csv') }}" enctype="multipart/form-data" novalidate>{{ csrf() }}
+      <label class="form-label" for="csvA">CSV file (max {{ config.MAX_UPLOAD_MB }} MB)</label><input class="form-control mb-2" id="csvA" name="file" type="file" accept=".csv" required><div class="invalid-feedback">Choose a .csv file.</div>
+      <div class="form-text mb-3">Columns: <code>student_email, course_name, activity_type, duration, activity_time</code>. <a href="{{ url_for('static', filename='samples/sample_activities.csv') }}" download>Download sample</a></div>
+      <button class="btn btn-outline-primary w-100" type="submit"><i class="bi bi-file-earmark-arrow-up me-1"></i>Validate &amp; import</button></form></div></div>{% endif %}
+</div>
+
+<form class="card-x card-body-x filters mb-3 row g-2 align-items-end" method="get">
+  {% if faculty %}<div class="col-md-2"><label class="form-label" for="q">Student</label><input class="form-control" id="q" name="q" value="{{ request.args.get('q','') }}" placeholder="Name"></div>{% endif %}
+  <div class="col-md-3"><label class="form-label" for="fc">Course</label><select class="form-select" id="fc" name="course_id"><option value="">All</option>{% for c in courses %}<option value="{{ c.course_id }}" {{ 'selected' if request.args.get('course_id')|string == c.course_id|string }}>{{ c.course_name }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><label class="form-label" for="ft">Type</label><select class="form-select" id="ft" name="type"><option value="">All</option>{% for k, v in ACTIVITY_TYPES.items() %}<option value="{{ k }}" {{ 'selected' if request.args.get('type') == k }}>{{ v }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><label class="form-label" for="fs">From</label><input class="form-control" type="date" id="fs" name="start" value="{{ request.args.get('start','') }}"></div>
+  <div class="col-md-2"><label class="form-label" for="fe">To</label><input class="form-control" type="date" id="fe" name="end" value="{{ request.args.get('end','') }}"></div>
+  <div class="col-md-1 d-flex gap-1"><button class="btn btn-primary flex-fill" aria-label="Filter"><i class="bi bi-funnel"></i></button><a class="btn btn-outline-secondary" href="{{ url_for('activities.index') }}" aria-label="Clear filters"><i class="bi bi-x-lg"></i></a></div>
+</form>
+<div class="card-x">
+  {% if activities %}<div class="table-responsive"><table class="table table-x align-middle"><thead><tr><th>When</th>{% if faculty %}<th>Student</th>{% endif %}<th>Course</th><th>Type</th><th>Minutes</th><th>Source</th><th class="text-end">Actions</th></tr></thead><tbody>
+    {% for a in activities %}<tr><td>{{ a.activity_time|dt }}</td>{% if faculty %}<td>{{ a.student_name }}</td>{% endif %}<td>{{ a.course_name }}</td><td>{{ ACTIVITY_TYPES[a.activity_type] }}</td><td>{{ a.duration }}</td><td>{{ source(a.source) }}</td>
+      <td class="text-end">{% if faculty or (a.source == 'manual' and a.student_id == current_user.user_id) %}<div class="dropdown"><button class="btn btn-sm btn-light" data-bs-toggle="dropdown" aria-label="Actions"><i class="bi bi-three-dots-vertical"></i></button><ul class="dropdown-menu dropdown-menu-end"><li>{{ confirm_form(url_for('activities.delete', activity_id=a.activity_id), 'Delete this activity record?', 'Delete') }}</li></ul></div>{% endif %}</td></tr>{% endfor %}
+  </tbody></table></div>{{ table_footer(page, total, per_page, 'activity') }}
+  {% else %}{{ empty('activity', 'No activities match', 'Record an activity above or adjust the filters.') }}{% endif %}
+</div>
+{% endblock %}
